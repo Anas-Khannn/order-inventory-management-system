@@ -37,7 +37,7 @@ export default {
         chart: { 1: "hsl(var(--chart-1))", 2: "hsl(var(--chart-2))", 3: "hsl(var(--chart-3))", 4: "hsl(var(--chart-4))", 5: "hsl(var(--chart-5))" },
       },
       borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 2px)", sm: "calc(var(--radius) - 4px)" },
-      transitionTimingFunction: { "out-expo": "cubic-bezier(0.16, 1, 0.3, 1)" },
+      transitionTimingFunction: { "out-expo": "cubic-bezier(0.16, 1, 0.3, 1)", fluid: "cubic-bezier(0.32, 0.72, 0, 1)" },
       keyframes: {
         flash: { "0%": { backgroundColor: "hsl(var(--accent))" }, "100%": { backgroundColor: "transparent" } },
         shimmer: { "100%": { transform: "translateX(100%)" } },

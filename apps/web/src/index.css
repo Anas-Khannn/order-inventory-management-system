@@ -116,3 +116,69 @@
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ------------------------------------------------------------------------------------------
+ * Fluid interface layer (after Apple's "Designing Fluid Interfaces").
+ * ---------------------------------------------------------------------------------------- */
+:root {
+  /* iOS sheet curve for entering; its mirror (inverse control points) for leaving, so the
+     outbound path retraces the inbound one. */
+  --ease-in-out-fluid: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-exit-fluid: cubic-bezier(1, 0, 0.68, 0.28);
+}
+
+@layer base {
+  html { -webkit-tap-highlight-color: transparent; }
+
+  /* Size-specific tracking & leading: tighten large type, give small type a little air. */
+  h1 { letter-spacing: -0.022em; line-height: 1.1; }
+  h2, h3 { letter-spacing: -0.011em; }
+  .text-xs { letter-spacing: 0.006em; }
+  .text-\[11px\] { letter-spacing: 0.012em; }
+  body { line-height: 1.5; }
+}
+
+@layer components {
+  /* Dialogs grow out of their trigger (transform-origin is set from the press point in JS)
+     and shrink back into it. Opacity + scale only: compositor-friendly. */
+  .dialog-surface[data-state="open"] { animation: surface-in 340ms var(--ease-in-out-fluid) both; }
+  .dialog-surface[data-state="closed"] { animation: surface-out 200ms var(--ease-exit-fluid) both; }
+  .dialog-scrim[data-state="open"] { animation: scrim-in 300ms var(--ease-in-out-fluid) both; }
+  .dialog-scrim[data-state="closed"] { animation: scrim-out 200ms var(--ease-exit-fluid) both; }
+
+  /* Floating chrome: a translucent material content scrolls beneath. The hairline only
+     appears once content actually sits under the bar (scroll edge effect, not a fixed rule). */
+  .chrome-material {
+    background-color: hsl(var(--background) / 0.72);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    box-shadow: 0 1px 0 0 transparent;
+    transition: box-shadow 200ms ease;
+  }
+  .chrome-material[data-scrolled="true"] { box-shadow: 0 1px 0 0 hsl(var(--border)); }
+
+  /* Theme switches cross-fade instead of flashing between light and dark. */
+  .theme-transition,
+  .theme-transition *,
+  .theme-transition *::before,
+  .theme-transition *::after {
+    transition: background-color 280ms ease, border-color 280ms ease, color 280ms ease, fill 280ms ease, stroke 280ms ease !important;
+  }
+}
+
+@keyframes surface-in { from { opacity: 0; transform: scale(0.88); } to { opacity: 1; transform: scale(1); } }
+@keyframes surface-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.92); } }
+@keyframes scrim-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scrim-out { from { opacity: 1; } to { opacity: 0; } }
+
+/* Reduced transparency: frosted surfaces become solid. */
+@media (prefers-reduced-transparency: reduce) {
+  .chrome-material { background-color: hsl(var(--background)); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* Increased contrast: near-solid chrome with a defined edge. */
+@media (prefers-contrast: more) {
+  .chrome-material { background-color: hsl(var(--background)); box-shadow: 0 1px 0 0 hsl(var(--foreground) / 0.4); }
+  :root { --border: 240 5% 70%; }
+  .dark { --border: 240 5% 40%; }
+}
