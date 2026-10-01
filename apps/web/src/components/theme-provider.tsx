@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
 export type Theme = "light" | "dark" | "system";
 const STORAGE_KEY = "oi-theme";
@@ -35,8 +35,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const resolved = theme === "system" ? (isSystemDark ? "dark" : "light") : theme;
 
+  const first = useRef(true);
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", resolved === "dark");
+    const root = document.documentElement;
+    // Ease the brightness change instead of flashing (skipped on first paint and for reduced motion).
+    const animate = !first.current && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    first.current = false;
+    if (animate) root.classList.add("theme-transition");
+    root.classList.toggle("dark", resolved === "dark");
+    if (!animate) return;
+    const t = setTimeout(() => root.classList.remove("theme-transition"), 320);
+    return () => clearTimeout(t);
   }, [resolved]);
 
   const setTheme = (t: Theme) => {
