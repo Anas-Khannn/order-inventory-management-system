@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 240 5.9% 10%;
+    --chart-1: 221 83% 53%;
+    --chart-2: 160 70% 40%;
+    --chart-3: 32 95% 50%;
+    --chart-4: 280 65% 58%;
+    --chart-5: 346 77% 55%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 5.5%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+    --sidebar-background: 240 5.9% 6%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 0 0% 98%;
+    --sidebar-primary-foreground: 240 5.9% 10%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 240 4.9% 83.9%;
+    --chart-1: 217 91% 62%;
+    --chart-2: 160 64% 48%;
+    --chart-3: 32 95% 58%;
+    --chart-4: 280 70% 68%;
+    --chart-5: 346 80% 62%;
+    color-scheme: dark;
+  }
+
+  * { @apply border-border; }
+  body { @apply bg-background font-sans text-foreground antialiased; }
+  /* One icon weight everywhere: lucide at 1.75 sits closer to the Geist stroke than the default 2. */
+  .lucide { stroke-width: 1.75; }
+}
+
+@layer base {
+  /* Respect the OS "reduce motion" setting everywhere: keep state changes, drop the movement. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+  /* Default keyboard focus ring for anything without its own focus-visible styles. */
+  :focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+}
+
+@layer components {
+  /* Staggered entrance for dashboard tiles: tiles stay put (so the hairline grid never flashes),
+     their contents rise in one after another. */
+  .stagger > * > * { animation: rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .stagger > :nth-child(1) > * { animation-delay: 0ms; }
+  .stagger > :nth-child(2) > * { animation-delay: 40ms; }
+  .stagger > :nth-child(3) > * { animation-delay: 80ms; }
+  .stagger > :nth-child(4) > * { animation-delay: 120ms; }
+  .stagger > :nth-child(5) > * { animation-delay: 160ms; }
+  .stagger > :nth-child(6) > * { animation-delay: 200ms; }
+  .stagger > :nth-child(7) > * { animation-delay: 240ms; }
+  .stagger > :nth-child(8) > * { animation-delay: 280ms; }
+  .stagger > :nth-child(9) > * { animation-delay: 320ms; }
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
