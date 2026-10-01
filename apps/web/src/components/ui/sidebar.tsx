@@ -11,6 +11,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { project, rubberband, spring, velocityFrom, type SpringHandle } from "@/lib/spring";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
@@ -87,6 +88,155 @@ export function SidebarProvider({ defaultOpen = true, className, style, children
   );
 }
 
+/**
+ * Phone navigation sheet driven by springs instead of CSS keyframes, so it is fully
+ * interruptible: it tracks the finger 1:1 (respecting the grab point), rubber-bands past
+ * its open edge, projects the release velocity to decide open vs. closed, and hands that
+ * velocity to the settling spring. It can be grabbed again at any moment mid-animation.
+ */
+function MobileSheet({ open, onOpenChange, side, children }: { open: boolean; onOpenChange: (o: boolean) => void; side: "left" | "right"; children: React.ReactNode }) {
+  const [visible, setVisible] = React.useState(open);
+  const panel = React.useRef<HTMLDivElement | null>(null);
+  // Radix mounts portal content a render late, so track the element to know when it exists.
+  const [panelEl, setPanelEl] = React.useState<HTMLDivElement | null>(null);
+  const panelRef = React.useCallback((el: HTMLDivElement | null) => {
+    panel.current = el;
+    setPanelEl(el);
+  }, []);
+  const overlay = React.useRef<HTMLDivElement>(null);
+  const anim = React.useRef<SpringHandle | null>(null);
+  const pos = React.useRef<number | null>(null); // presentation value (px); 0 = fully open
+  const releaseVelocity = React.useRef(0);
+  const drag = React.useRef<{ id: number; x0: number; y0: number; origin: number; locked: boolean | null; samples: { t: number; x: number }[] } | null>(null);
+  const suppressClick = React.useRef(false);
+  const dir = side === "left" ? -1 : 1; // closed offset direction
+
+  const width = () => panel.current?.offsetWidth ?? 272;
+  const apply = (x: number) => {
+    pos.current = x;
+    if (panel.current) panel.current.style.transform = `translate3d(${x}px,0,0)`;
+    if (overlay.current) overlay.current.style.opacity = String(Math.max(0, Math.min(1, 1 - Math.abs(x) / width())));
+  };
+  const settle = (to: number, velocity: number, damping: number, response: number, onComplete?: () => void) => {
+    anim.current?.stop();
+    anim.current = spring({ from: pos.current ?? to, to, velocity, damping, response, onUpdate: apply, onComplete });
+  };
+
+  React.useEffect(() => {
+    if (open) setVisible(true);
+  }, [open]);
+
+  // Drive open/close from the current on-screen position, carrying any gesture velocity.
+  React.useLayoutEffect(() => {
+    if (!visible || !panelEl) return;
+    if (open) {
+      if (pos.current === null) apply(dir * width());
+      settle(0, releaseVelocity.current, 1, 0.35);
+    } else {
+      settle(dir * width(), releaseVelocity.current, 1, 0.3, () => {
+        pos.current = null;
+        setVisible(false);
+      });
+    }
+    releaseVelocity.current = 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, visible, panelEl]);
+
+  React.useEffect(() => () => void anim.current?.stop(), []);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    // Grab mid-flight: freeze the spring where it is and continue from there.
+    const live = anim.current?.stop();
+    if (live) pos.current = live.value;
+    drag.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, origin: pos.current ?? 0, locked: null, samples: [{ t: e.timeStamp, x: pos.current ?? 0 }] };
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d || d.id !== e.pointerId) return;
+    const dx = e.clientX - d.x0;
+    const dy = e.clientY - d.y0;
+    if (d.locked === null) {
+      // ~10px hysteresis before committing to a direction; vertical intent stays a scroll.
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+        d.locked = true;
+        panel.current?.setPointerCapture(e.pointerId);
+      } else if (Math.abs(dy) > 10) {
+        d.locked = false;
+      }
+    }
+    if (!d.locked) return;
+    let x = d.origin + dx;
+    // Past the fully-open edge: resist progressively instead of stopping dead.
+    if (x * dir < 0) x = rubberband(x, width());
+    apply(x);
+    d.samples.push({ t: e.timeStamp, x });
+    if (d.samples.length > 8) d.samples.shift();
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d || d.id !== e.pointerId) return;
+    if (!d.locked) {
+      // A tap that interrupted a spring: let it finish toward the current target.
+      if (anim.current && pos.current !== null && pos.current !== 0 && open) settle(0, 0, 1, 0.35);
+      return;
+    }
+    suppressClick.current = true;
+    const v = velocityFrom(d.samples);
+    const projected = (pos.current ?? 0) + project(v);
+    const shouldClose = projected * dir > width() / 2;
+    releaseVelocity.current = v;
+    if (shouldClose) onOpenChange(false);
+    // Snapping back after a flick carries momentum, so allow a touch of overshoot (Apple's drawer: 0.8).
+    else settle(0, v, Math.abs(v) > 300 ? 0.8 : 1, 0.3);
+  };
+
+  if (!visible) return null;
+
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Portal forceMount>
+        <DialogPrimitive.Overlay ref={overlay} forceMount className={cn("fixed inset-0 z-50 bg-black/45 opacity-0", !open && "pointer-events-none")} />
+        <DialogPrimitive.Content
+          ref={panelRef}
+          forceMount
+          data-sidebar="sidebar"
+          data-mobile="true"
+          onOpenAutoFocus={(e) => {
+            // Keep focus inside the sheet without painting a ring on the first item for pointer users.
+            e.preventDefault();
+            (e.currentTarget as HTMLElement).focus();
+          }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onClickCapture={(e) => {
+            // A drag that ends over a link must not also count as a tap on it.
+            if (suppressClick.current) {
+              e.preventDefault();
+              e.stopPropagation();
+              suppressClick.current = false;
+            }
+          }}
+          style={{ "--sidebar-width": SIDEBAR_WIDTH_MOBILE, transform: `translate3d(${dir * 100}%,0,0)`, touchAction: "pan-y" } as React.CSSProperties}
+          className={cn(
+            "fixed inset-y-0 z-50 flex w-[--sidebar-width] select-none flex-col bg-sidebar text-sidebar-foreground shadow-2xl outline-none will-change-transform",
+            side === "left" ? "left-0 border-r" : "right-0 border-l",
+          )}
+        >
+          <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
+          <DialogPrimitive.Description className="sr-only">Main navigation and theme settings. Swipe to close.</DialogPrimitive.Description>
+          {children}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  );
+}
+
 export function Sidebar({
   side = "left",
   variant = "sidebar",
@@ -107,29 +257,9 @@ export function Sidebar({
 
   if (isMobile) {
     return (
-      <DialogPrimitive.Root open={openMobile} onOpenChange={setOpenMobile}>
-        <DialogPrimitive.Portal>
-          <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
-          <DialogPrimitive.Content
-            data-sidebar="sidebar"
-            data-mobile="true"
-            // Keep focus inside the sheet without painting a ring on the first item for pointer users.
-            onOpenAutoFocus={(e) => {
-              e.preventDefault();
-              (e.currentTarget as HTMLElement).focus();
-            }}
-            style={{ "--sidebar-width": SIDEBAR_WIDTH_MOBILE } as React.CSSProperties}
-            className={cn(
-              "fixed inset-y-0 z-50 flex w-[--sidebar-width] flex-col bg-sidebar text-sidebar-foreground shadow-xl outline-none duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-200",
-              side === "left" ? "left-0 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left" : "right-0 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
-            )}
-          >
-            <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
-            <DialogPrimitive.Description className="sr-only">Main navigation and theme settings</DialogPrimitive.Description>
-            {children}
-          </DialogPrimitive.Content>
-        </DialogPrimitive.Portal>
-      </DialogPrimitive.Root>
+      <MobileSheet open={openMobile} onOpenChange={setOpenMobile} side={side}>
+        {children}
+      </MobileSheet>
     );
   }
 
@@ -144,7 +274,7 @@ export function Sidebar({
       {/* Spacer: reserves the sidebar's width in the layout and animates with it. */}
       <div
         className={cn(
-          "relative h-svh w-[--sidebar-width] bg-transparent transition-[width] duration-200 ease-out",
+          "relative h-svh w-[--sidebar-width] bg-transparent transition-[width] duration-300 ease-fluid",
           "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
           variant === "floating" || variant === "inset"
@@ -154,7 +284,7 @@ export function Sidebar({
       />
       <div
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-[--sidebar-width] transition-[left,right,width] duration-200 ease-out md:flex",
+          "fixed inset-y-0 z-10 hidden h-svh w-[--sidebar-width] transition-[left,right,width] duration-300 ease-fluid md:flex",
           side === "left"
             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
