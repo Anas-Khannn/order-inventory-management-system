@@ -9,6 +9,9 @@ import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
 import "./index.css";
 
+// iOS Safari only applies :active (our instant press feedback) when a touch listener exists.
+document.addEventListener("touchstart", () => {}, { passive: true });
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 15_000, retry: 1, refetchOnWindowFocus: false } },
 });
