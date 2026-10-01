@@ -1,5 +1,5 @@
 import { Ban, Boxes, LayoutDashboard, Monitor, Moon, Package, PackageX, ShoppingCart, Sun, TriangleAlert, type LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useTheme, type Theme } from "@/components/theme-provider";
 import {
   Sidebar,
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useRestockCount } from "@/hooks/queries";
 import { useHashLocation } from "@/hooks/use-hash-query";
+import { useSlidingThumb } from "@/hooks/use-sliding-thumb";
 import { cn } from "@/lib/utils";
 
 export type NavKey = "dashboard" | "products" | "orders";
@@ -49,6 +50,7 @@ function ThemeControl() {
   const { theme, setTheme } = useTheme();
   const { state, isMobile } = useSidebar();
   const current = THEMES.find((t) => t.value === theme)!;
+  const { container, thumbStyle } = useSlidingThumb<HTMLDivElement>(THEMES.indexOf(current));
 
   // Collapsed rail: one button that cycles, with a tooltip naming the current theme.
   if (state === "collapsed" && !isMobile) {
@@ -68,17 +70,19 @@ function ThemeControl() {
   return (
     <div className="space-y-1.5 px-2">
       <p className="text-xs font-medium text-sidebar-foreground/70">Theme</p>
-      <div role="radiogroup" aria-label="Theme" className="grid grid-cols-3 gap-0.5 rounded-md border border-sidebar-border bg-background p-0.5">
+      <div ref={container} role="radiogroup" aria-label="Theme" className="relative grid grid-cols-3 gap-0.5 rounded-md border border-sidebar-border bg-background p-0.5">
+        <span aria-hidden className="pointer-events-none absolute left-0 top-0 rounded bg-sidebar-accent" style={thumbStyle} />
         {THEMES.map(({ value, label, icon: Icon }) => (
           <button
             key={value}
+            data-segment
             type="button"
             role="radio"
             aria-checked={theme === value}
             onClick={() => setTheme(value)}
             className={cn(
-              "flex items-center justify-center gap-1.5 rounded py-1.5 text-xs transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring coarse:py-2.5",
-              theme === value ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground" : "text-sidebar-foreground/70 hover:text-sidebar-foreground",
+              "relative flex items-center justify-center gap-1.5 rounded py-1.5 text-xs transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring active:opacity-70 coarse:py-2.5",
+              theme === value ? "font-medium text-sidebar-accent-foreground" : "text-sidebar-foreground/70 hover:text-sidebar-foreground",
             )}
           >
             <Icon className="h-3.5 w-3.5" aria-hidden />
@@ -167,8 +171,21 @@ function AppSidebar({ onNavigate }: { onNavigate: Navigate }) {
   );
 }
 
+/** True once the page has scrolled, so floating chrome can show its edge only when content is beneath it. */
+function useScrolled() {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 2);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  return scrolled;
+}
+
 export function AppShell({ active, onSelect, children }: { active: NavKey; onSelect: Navigate; children: ReactNode }) {
   const current = NAV.find((n) => n.key === active)!;
+  const scrolled = useScrolled();
 
   return (
     <SidebarProvider>
@@ -180,7 +197,7 @@ export function AppShell({ active, onSelect, children }: { active: NavKey; onSel
       </a>
       <AppSidebar onNavigate={onSelect} />
       <SidebarInset>
-        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-3 sm:px-4">
+        <header data-scrolled={scrolled} className="chrome-material sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 px-3 sm:px-4">
           <SidebarTrigger />
           <div aria-hidden className="mx-1 h-4 w-px bg-border" />
           <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm">
