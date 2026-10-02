@@ -21,10 +21,12 @@
 cp .env.example .env        # Windows: copy .env.example .env
 pnpm install
 pnpm db:up                  # starts Postgres in Docker
-pnpm db:migrate             # applies the Drizzle migration (or: pnpm db:push)
+pnpm db:migrate             # applies the Drizzle migrations (or: pnpm db:push)
 pnpm db:seed                # 14 products + 3 users (one per role, password Demo@1234)
 pnpm dev                    # web → :5173   api → :4000
 ```
+
+Open http://localhost:5173 and sign in. In development the sign-in page offers the three seeded roles (`admin@store.test`, `manager@store.test`, `staff@store.test`).
 
 > Need pnpm? `npm i -g pnpm` (Node 20+ required).
 
@@ -45,22 +47,23 @@ pnpm dev                    # web → :5173   api → :4000
 │   │   ├── db/                 schema.ts · client.ts · seed.ts
 │   │   ├── modules/products/   routes → facade → repository
 │   │   ├── modules/orders/     routes → facade → repository
-│   │   ├── middleware/         error handler (Zod, AppError, JSON)
+│   │   ├── modules/auth/       routes → facade → repository · scrypt + tokens · rate limit
+│   │   ├── middleware/         error handler · requireAuth · requirePermission
 │   │   └── app.ts · server.ts
 │   └── web/src
-│       ├── facades/            products.facade.ts · orders.facade.ts   ← only place that calls fetch
+│       ├── facades/            products · orders · auth facades   ← only place that calls fetch
 │       ├── hooks/              TanStack Query hooks (queries.ts)
-│       ├── features/           products/ · orders/  (pages + RHF dialogs)
+│       ├── features/           auth/ · dashboard/ · products/ · orders/  (pages + RHF forms)
 │       └── components/ui/      shadcn-style primitives
-└── packages/shared/src         schemas.ts · types.ts
+└── packages/shared/src         schemas.ts · types.ts · auth.ts (roles, permissions, password rules)
 ```
 
 ## 🎭 Facade pattern
 
 | Layer | Facade | Hides |
 |---|---|---|
-| Backend | `productFacade`, `orderFacade` | repositories, transactions, row locking, DTO mapping, DB error → HTTP error |
-| Frontend | `api.products`, `api.orders` | URLs, fetch, headers, response unwrapping, `ApiError` |
+| Backend | `productFacade`, `orderFacade`, `authFacade` | repositories, transactions, row locking, hashing, tokens, DTO mapping, DB error → HTTP error |
+| Frontend | `api.products`, `api.orders`, `authFacade` | URLs, fetch, bearer token, response unwrapping, `ApiError` |
 
 Routes only call facades. Components only call hooks, and hooks only call the frontend facades.
 
@@ -132,4 +135,7 @@ cd apps/web && npx shadcn@latest add select tabs toast
 - Order status is `CREATED` or `CANCELLED` only; orders can't be edited.
 - A repeated cancel returns `409` with a clear message.
 - Concurrency: two buyers for the last unit are serialized by the row lock, so the second one fails validation instead of overselling.
+- No mail provider yet: password reset links are logged and returned by the API outside production. Production needs an email sender.
+- The sign-in rate limit is in memory, so it applies per API process. Several instances would need Redis or a DB table.
+- `users:manage` exists as a permission, but there is no user management screen yet.
 - Fill in the "Tools / effort" section of your own submission README (time spent and AI usage).
