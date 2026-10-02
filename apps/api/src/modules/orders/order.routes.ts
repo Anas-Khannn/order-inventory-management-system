@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { createOrderSchema, idParamSchema, listOrdersQuerySchema } from "@repo/shared";
+import { requirePermission } from "../../middleware/auth";
 import { orderFacade } from "./order.facade";
 
 export const orderRoutes = Router();
@@ -13,12 +14,12 @@ orderRoutes.get("/:id", async (req, res) => {
   res.json({ data: await orderFacade.get(id) });
 });
 
-orderRoutes.post("/", async (req, res) => {
+orderRoutes.post("/", requirePermission("orders:write"), async (req, res) => {
   const data = await orderFacade.create(createOrderSchema.parse(req.body));
   res.status(201).json({ data });
 });
 
-orderRoutes.post("/:id/cancel", async (req, res) => {
+orderRoutes.post("/:id/cancel", requirePermission("orders:cancel"), async (req, res) => {
   const { id } = idParamSchema.parse(req.params);
   res.json({ data: await orderFacade.cancel(id) });
 });

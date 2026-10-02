@@ -16,6 +16,7 @@
     "db:migrate": "pnpm --filter @repo/api db:migrate",
     "db:push": "pnpm --filter @repo/api db:push",
     "db:seed": "pnpm --filter @repo/api db:seed",
+    "db:seed:users": "pnpm --filter @repo/api db:seed:users",
     "db:studio": "pnpm --filter @repo/api db:studio"
   },
   "devDependencies": {

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { idParamSchema, listProductsQuerySchema, productInputSchema, productStatusSchema } from "@repo/shared";
+import { requirePermission } from "../../middleware/auth";
 import { productFacade } from "./product.facade";
 
 export const productRoutes = Router();
@@ -17,17 +18,17 @@ productRoutes.get("/:id", async (req, res) => {
   res.json({ data: await productFacade.get(id) });
 });
 
-productRoutes.post("/", async (req, res) => {
+productRoutes.post("/", requirePermission("products:write"), async (req, res) => {
   const data = await productFacade.create(productInputSchema.parse(req.body));
   res.status(201).json({ data });
 });
 
-productRoutes.put("/:id", async (req, res) => {
+productRoutes.put("/:id", requirePermission("products:write"), async (req, res) => {
   const { id } = idParamSchema.parse(req.params);
   res.json({ data: await productFacade.update(id, productInputSchema.parse(req.body)) });
 });
 
-productRoutes.patch("/:id/status", async (req, res) => {
+productRoutes.patch("/:id/status", requirePermission("products:write"), async (req, res) => {
   const { id } = idParamSchema.parse(req.params);
   const { status } = productStatusSchema.parse(req.body);
   res.json({ data: await productFacade.setStatus(id, status) });

@@ -22,7 +22,7 @@ cp .env.example .env        # Windows: copy .env.example .env
 pnpm install
 pnpm db:up                  # starts Postgres in Docker
 pnpm db:migrate             # applies the Drizzle migration (or: pnpm db:push)
-pnpm db:seed                # 14 products (1 inactive, 1 zero-stock)
+pnpm db:seed                # 14 products + 3 users (one per role, password Demo@1234)
 pnpm dev                    # web → :5173   api → :4000
 ```
 
@@ -64,20 +64,40 @@ pnpm dev                    # web → :5173   api → :4000
 
 Routes only call facades. Components only call hooks, and hooks only call the frontend facades.
 
+## 🔐 Auth and roles
+
+Every `/api/products` and `/api/orders` route needs `Authorization: Bearer <token>`. Write routes also check the role.
+
+| Role | Can |
+|---|---|
+| ADMIN | everything, including `users:manage` |
+| MANAGER | `products:write`, `orders:write`, `orders:cancel` |
+| STAFF | read everything, `orders:write` |
+
+- Passwords: `scrypt` (Node standard library), salted, compared in constant time.
+- Sessions: random 256-bit opaque tokens. Only their SHA-256 is stored, so logout and password reset can revoke them.
+- Sign-in: 5 failed attempts per email + IP every 15 minutes; unknown emails take the same time as wrong passwords.
+- Reset links: single use, 30 minutes, end every session of the user. No mail service yet: outside production the link is logged and returned (`AUTH_EXPOSE_RESET_LINK`).
+
 ## 🔌 API
 
 | Method | Endpoint | Notes |
 |---|---|---|
+| POST | `/api/auth/login` | `{ email, password, remember }` → `{ user, token, expiresAt }` |
+| POST | `/api/auth/logout` | revokes the current token (204) |
+| GET | `/api/auth/me` | the signed-in user |
+| POST | `/api/auth/forgot-password` | always 202, whether or not the email exists |
+| POST | `/api/auth/reset-password` | `{ token, password }` (204) |
 | GET | `/api/products?search=&status=&page=` | search + status + pagination together (page size 10) |
 | GET | `/api/products/options` | all active products (for the order form) |
-| POST / PUT | `/api/products`, `/api/products/:id` | create / edit |
-| PATCH | `/api/products/:id/status` | deactivate / reactivate |
+| POST / PUT | `/api/products`, `/api/products/:id` | create / edit (`products:write`) |
+| PATCH | `/api/products/:id/status` | deactivate / reactivate (`products:write`) |
 | GET | `/api/orders?page=` | list |
 | GET | `/api/orders/:id` | detail with items |
-| POST | `/api/orders` | create (transaction + row lock) |
-| POST | `/api/orders/:id/cancel` | cancel (second call → `409 ALREADY_CANCELLED`, no double restore) |
+| POST | `/api/orders` | create (transaction + row lock) (`orders:write`) |
+| POST | `/api/orders/:id/cancel` | cancel (second call → `409 ALREADY_CANCELLED`, no double restore) (`orders:cancel`) |
 
-Errors always look like `{ "error": { "code", "message", "details" } }`.
+Errors always look like `{ "error": { "code", "message", "details" } }`. No token → `401 UNAUTHORIZED`; wrong role → `403 FORBIDDEN`.
 
 ## 🛡️ Business rules built in
 
@@ -97,7 +117,8 @@ Errors always look like `{ "error": { "code", "message", "details" } }`.
 | `pnpm db:up` / `db:down` | start / stop Postgres |
 | `pnpm db:generate` | create a migration after editing `schema.ts` |
 | `pnpm db:migrate` / `db:push` | apply migrations / sync schema directly |
-| `pnpm db:seed` | reset and seed products |
+| `pnpm db:seed` | **wipe** and seed products and demo users |
+| `pnpm db:seed:users` | add the demo users only (keeps existing data) |
 | `pnpm db:studio` | Drizzle Studio |
 
 ### ➕ Add more shadcn components

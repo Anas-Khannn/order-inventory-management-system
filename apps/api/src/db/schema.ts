@@ -1,9 +1,10 @@
 import { relations, sql } from "drizzle-orm";
-import { check, index, integer, numeric, pgEnum, pgTable, serial, timestamp, unique, varchar } from "drizzle-orm/pg-core";
-import { ORDER_STATUS, PRODUCT_STATUS } from "@repo/shared";
+import { check, index, integer, numeric, pgEnum, pgTable, serial, timestamp, unique, uniqueIndex, varchar } from "drizzle-orm/pg-core";
+import { ORDER_STATUS, PRODUCT_STATUS, USER_ROLE } from "@repo/shared";
 
 export const productStatusEnum = pgEnum("product_status", PRODUCT_STATUS);
 export const orderStatusEnum = pgEnum("order_status", ORDER_STATUS);
+export const userRoleEnum = pgEnum("user_role", USER_ROLE);
 
 export const products = pgTable(
   "products",
@@ -70,3 +71,48 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
   product: one(products, { fields: [orderItems.productId], references: [products.id] }),
 }));
+
+/** Emails are stored lower-cased; the unique index on lower(email) also guards rows written outside the API. */
+export const users = pgTable(
+  "users",
+  {
+    id: serial("id").primaryKey(),
+    name: varchar("name", { length: 150 }).notNull(),
+    email: varchar("email", { length: 254 }).notNull(),
+    passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+    role: userRoleEnum("role").notNull().default("STAFF"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("uq_users_email").on(sql`lower(${t.email})`), check("chk_users_name", sql`btrim(${t.name}) <> ''`)],
+);
+
+/** Opaque bearer sessions. Only a SHA-256 of the token is stored, so a DB leak cannot be replayed. */
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("uq_sessions_token_hash").on(t.tokenHash), index("idx_sessions_user_id").on(t.userId)],
+);
+
+/** Single-use reset links. `usedAt` is set when consumed, so a link cannot be replayed. */
+export const passwordResets = pgTable(
+  "password_resets",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("uq_password_resets_token_hash").on(t.tokenHash), index("idx_password_resets_user_id").on(t.userId)],
+);
+
+export const usersRelations = relations(users, ({ many }) => ({ sessions: many(sessions) }));
+export const sessionsRelations = relations(sessions, ({ one }) => ({ user: one(users, { fields: [sessions.userId], references: [users.id] }) }));

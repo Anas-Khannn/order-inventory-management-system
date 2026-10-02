@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db, pool } from "./client";
+import { DEMO_PASSWORD, seedDemoUsers } from "./demo-users";
 import { products } from "./schema";
 
 const rows: (typeof products.$inferInsert)[] = [
@@ -20,9 +21,11 @@ const rows: (typeof products.$inferInsert)[] = [
 ];
 
 async function main() {
-  await db.execute(sql`TRUNCATE TABLE order_items, orders, products RESTART IDENTITY CASCADE`);
+  await db.execute(sql`TRUNCATE TABLE order_items, orders, products, password_resets, sessions, users RESTART IDENTITY CASCADE`);
   await db.insert(products).values(rows);
   console.log(`Seeded ${rows.length} products`);
+
+  console.log(`Seeded ${await seedDemoUsers()} users (password: ${DEMO_PASSWORD})`);
   await pool.end();
 }
 

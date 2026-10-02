@@ -8,6 +8,13 @@
       "when": 1790883200234,
       "tag": "0000_slim_slyde",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790934162941,
+      "tag": "0001_wet_dark_beast",
+      "breakpoints": true
     }
   ]
 }
