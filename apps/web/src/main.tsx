@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MotionConfig } from "framer-motion";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { Toaster } from "sonner";
 import App from "./App";
 import { ThemeProvider, useTheme } from "./components/theme-provider";
+import { AuthProvider } from "./features/auth/auth-provider";
 // Self-hosted Geist (variable weights) so typography never depends on a third-party CDN.
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
@@ -24,7 +26,12 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <App />
+        {/* "user": honour the OS reduce-motion setting (transforms drop, fades stay). */}
+        <MotionConfig reducedMotion="user">
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </MotionConfig>
         <ThemedToaster />
       </QueryClientProvider>
     </ThemeProvider>

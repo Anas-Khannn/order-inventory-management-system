@@ -5,6 +5,7 @@ import { Status } from "@/components/ui/status";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useAuth } from "@/features/auth/auth-provider";
 import { useCancelOrder, useOrder } from "@/hooks/queries";
 import { formatDate, formatPKR } from "@/lib/format";
 import { notify } from "@/lib/notify";
@@ -23,6 +24,7 @@ const Meta = ({ label, children }: { label: string; children: ReactNode }) => (
 export function OrderDetailDialog({ orderId, onClose }: { orderId: number | null; onClose: () => void }) {
   const { data: order, isLoading, isError, error, refetch } = useOrder(orderId);
   const cancel = useCancelOrder();
+  const canCancel = useAuth().can("orders:cancel");
   const [confirming, setConfirming] = useState(false);
 
   const close = () => {
@@ -93,7 +95,7 @@ export function OrderDetailDialog({ orderId, onClose }: { orderId: number | null
               <span className="text-lg font-semibold tabular-nums">{formatPKR(order.totalAmount)}</span>
             </div>
 
-            {order.status === "CREATED" && (
+            {order.status === "CREATED" && canCancel && (
               <DialogFooter className="border-t pt-4">
                 {confirming ? (
                   <div className="flex w-full flex-col gap-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 sm:flex-row sm:items-center sm:justify-end">

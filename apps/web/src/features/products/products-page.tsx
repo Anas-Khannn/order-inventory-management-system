@@ -17,6 +17,7 @@ import { useProducts, useSetProductStatus } from "@/hooks/queries";
 import { formatDate, formatPKR } from "@/lib/format";
 import { notify } from "@/lib/notify";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/features/auth/auth-provider";
 import { ProductFormDialog } from "./product-form-dialog";
 
 const DEFAULTS = { q: "", status: "", stock: "", sort: "createdAt", dir: "desc", page: "1" };
@@ -53,7 +54,8 @@ export function ProductsPage() {
   const { data, isLoading, isError, error, refetch, isFetching } = useProducts(params);
   const toggle = useSetProductStatus();
 
-  const columns = useMemo<ColumnDef<ProductDto>[]>(() => {
+  const canWrite = useAuth().can("products:write");
+  const allColumns = useMemo<ColumnDef<ProductDto>[]>(() => {
     const setProductStatus = (p: ProductDto, next: ProductStatus, isUndo = false) => {
       flash(p.id);
       toggle.mutate(
@@ -133,6 +135,8 @@ export function ProductsPage() {
       },
     ];
   }, [toggle, flash]);
+  // Read-only roles see the catalog without the row actions.
+  const columns = useMemo(() => (canWrite ? allColumns : allColumns.filter((c) => c.id !== "actions")), [allColumns, canWrite]);
 
   const sorting: SortingState = [{ id: f.sort, desc: f.dir === "desc" }];
   const table = useReactTable({
@@ -169,14 +173,16 @@ export function ProductsPage() {
             {data ? `${data.meta.total} product${data.meta.total === 1 ? "" : "s"}${filtered ? " match these filters" : ""}` : "Loading products"}
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setEditing(undefined);
-            setFormOpen(true);
-          }}
-        >
-          <Plus className="h-4 w-4" /> New product
-        </Button>
+        {canWrite && (
+          <Button
+            onClick={() => {
+              setEditing(undefined);
+              setFormOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4" /> New product
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
@@ -226,11 +232,13 @@ export function ProductsPage() {
           ) : (
             <EmptyState
               message="No products yet"
-              hint="Add your first product to start taking orders."
+              hint={canWrite ? "Add your first product to start taking orders." : "A manager or admin can add products."}
               action={
-                <Button size="sm" onClick={() => setFormOpen(true)}>
-                  <Plus className="h-4 w-4" /> New product
-                </Button>
+                canWrite && (
+                  <Button size="sm" onClick={() => setFormOpen(true)}>
+                    <Plus className="h-4 w-4" /> New product
+                  </Button>
+                )
               }
             />
           )

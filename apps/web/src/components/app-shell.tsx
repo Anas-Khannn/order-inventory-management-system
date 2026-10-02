@@ -1,4 +1,4 @@
-import { Ban, Boxes, LayoutDashboard, Monitor, Moon, Package, PackageX, ShoppingCart, Sun, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Ban, Boxes, LayoutDashboard, LogOut, Monitor, Moon, Package, PackageX, ShoppingCart, Sun, TriangleAlert, type LucideIcon } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useTheme, type Theme } from "@/components/theme-provider";
 import {
@@ -19,6 +19,9 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ROLE_LABEL } from "@/facades/auth.facade";
+import { useAuth } from "@/features/auth/auth-provider";
 import { useRestockCount } from "@/hooks/queries";
 import { useHashLocation } from "@/hooks/use-hash-query";
 import { useSlidingThumb } from "@/hooks/use-sliding-thumb";
@@ -94,6 +97,60 @@ function ThemeControl() {
   );
 }
 
+function UserControl() {
+  const { session, logout } = useAuth();
+  const { state, isMobile } = useSidebar();
+  if (!session) return null;
+  const { name, email, role } = session.user;
+  const initials = name
+    .split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("");
+
+  // Collapsed rail: the sign-out action alone, named in its tooltip.
+  if (state === "collapsed" && !isMobile) {
+    return (
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton tooltip={`Sign out ${name} (${ROLE_LABEL[role]})`} onClick={() => void logout()}>
+            <LogOut />
+            <span>Sign out</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
+      <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-xs font-semibold text-sidebar-accent-foreground">
+        {initials}
+      </span>
+      <span className="grid min-w-0 flex-1 leading-tight">
+        <span className="flex items-center gap-1.5">
+          <span className="truncate text-sm font-medium">{name}</span>
+          <span className="shrink-0 rounded border border-sidebar-border px-1 py-px text-[10px] font-medium uppercase tracking-wide text-sidebar-foreground/70">{ROLE_LABEL[role]}</span>
+        </span>
+        <span className="truncate text-xs text-sidebar-foreground/70">{email}</span>
+      </span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => void logout()}
+            aria-label="Sign out"
+            className="flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring active:opacity-70 coarse:size-11"
+          >
+            <LogOut className="size-4" aria-hidden />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top">Sign out</TooltipContent>
+      </Tooltip>
+    </div>
+  );
+}
+
 function AppSidebar({ onNavigate }: { onNavigate: Navigate }) {
   const { path, params } = useHashLocation();
   const { isMobile, setOpenMobile } = useSidebar();
@@ -163,8 +220,9 @@ function AppSidebar({ onNavigate }: { onNavigate: Navigate }) {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="pb-3">
+      <SidebarFooter className="gap-3 pb-3">
         <ThemeControl />
+        <UserControl />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
