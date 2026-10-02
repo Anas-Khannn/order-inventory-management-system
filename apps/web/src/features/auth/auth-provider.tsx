@@ -1,4 +1,4 @@
-import { can as roleCan, type LoginInput, type Permission, type SessionDto } from "@repo/shared";
+import { can as roleCan, type LoginInput, type Permission, type SessionDto, type SignupInput } from "@repo/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { authFacade } from "@/facades/auth.facade";
@@ -10,6 +10,8 @@ interface AuthCtx {
   session: SessionDto | null;
   /** Checks credentials and stores the session, but does not switch to the app yet. */
   login: (input: LoginInput) => Promise<SessionDto>;
+  /** Creates a Staff account and stores its session, like `login`. */
+  signup: (input: SignupInput) => Promise<SessionDto>;
   /** Switches to the app. Separate from `login` so the form can play its success state first. */
   commit: (s: SessionDto) => void;
   logout: () => Promise<void>;
@@ -105,6 +107,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return s;
   }, []);
 
+  const signup = useCallback(async (input: SignupInput) => {
+    const s = await authFacade.signup(input);
+    writeSession(s, false);
+    return s;
+  }, []);
+
   const commit = useCallback((s: SessionDto) => setSession(s), [setSession]);
 
   const logout = useCallback(async () => {
@@ -115,8 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clear]);
 
   const value = useMemo<AuthCtx>(
-    () => ({ session, login, logout, commit, can: (p) => !!session && roleCan(session.user.role, p) }),
-    [session, login, logout, commit],
+    () => ({ session, login, signup, logout, commit, can: (p) => !!session && roleCan(session.user.role, p) }),
+    [session, login, signup, logout, commit],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -83,6 +83,17 @@ describe("route protection", () => {
     expect(res.status).toBe(400);
   });
 
+  it("validates sign-up input before touching the database", async () => {
+    const res = await fetch(`${base}/auth/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "", email: "bad", password: "weak" }),
+    });
+    expect(res.status).toBe(400);
+    const paths = ((await res.json()) as { error: { details: { path: string }[] } }).error.details.map((d) => d.path);
+    expect(paths).toEqual(expect.arrayContaining(["name", "email", "password"]));
+  });
+
   it("rejects a weak new password", async () => {
     const res = await fetch(`${base}/auth/reset-password`, {
       method: "POST",

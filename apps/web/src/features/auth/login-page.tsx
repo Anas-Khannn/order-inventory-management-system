@@ -144,6 +144,13 @@ export function LoginPage({ onSignedIn }: { onSignedIn: () => void }) {
         </motion.div>
       </form>
 
+      <motion.p variants={riseItem} className="mt-6 text-center text-sm text-muted-foreground">
+        New here?{" "}
+        <a href="#/signup" className="rounded font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          Create an account
+        </a>
+      </motion.p>
+
       {DEMO_ACCOUNTS && (
         <motion.p variants={riseItem} className="mt-6 text-center text-xs text-muted-foreground">
           Seeded password for every role: <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-foreground">{DEMO_ACCOUNTS.password}</code>

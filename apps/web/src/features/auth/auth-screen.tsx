@@ -9,9 +9,10 @@ import { fluid, gentle, riseItem, snappy, stagger } from "@/lib/motion";
 import { ForgotPasswordPage } from "./forgot-password-page";
 import { LoginPage } from "./login-page";
 import { ResetPasswordPage } from "./reset-password-page";
+import { SignupPage } from "./signup-page";
 
 /** Order of the auth flow. Moving to a later step slides left, going back slides right. */
-const ROUTES = ["login", "forgot-password", "reset-password"] as const;
+const ROUTES = ["login", "signup", "forgot-password", "reset-password"] as const;
 type AuthRoute = (typeof ROUTES)[number];
 export const isAuthRoute = (path: string): path is AuthRoute => (ROUTES as readonly string[]).includes(path);
 
@@ -182,6 +183,7 @@ export function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
               <AnimatePresence mode="popLayout" initial={false} custom={dir.current}>
                 <motion.div key={route} custom={dir.current} variants={slide} initial="enter" animate="center" exit="exit">
                   {route === "login" && <LoginPage onSignedIn={onSignedIn} />}
+                  {route === "signup" && <SignupPage onSignedIn={onSignedIn} />}
                   {route === "forgot-password" && <ForgotPasswordPage initialEmail={params.get("email") ?? ""} />}
                   {route === "reset-password" && <ResetPasswordPage token={params.get("token") ?? ""} />}
                 </motion.div>

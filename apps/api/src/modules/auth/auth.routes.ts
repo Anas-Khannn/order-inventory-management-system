@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { forgotPasswordSchema, loginSchema, resetPasswordRequestSchema } from "@repo/shared";
+import { forgotPasswordSchema, loginSchema, resetPasswordRequestSchema, signupRequestSchema } from "@repo/shared";
 import { requireAuth } from "../../middleware/auth";
 import { authFacade } from "./auth.facade";
 
@@ -7,6 +7,10 @@ export const authRoutes = Router();
 
 authRoutes.post("/login", async (req, res) => {
   res.json({ data: await authFacade.login(loginSchema.parse(req.body), req.ip ?? "unknown") });
+});
+
+authRoutes.post("/signup", async (req, res) => {
+  res.status(201).json({ data: await authFacade.signup(signupRequestSchema.parse(req.body), req.ip ?? "unknown") });
 });
 
 authRoutes.post("/logout", requireAuth, async (req, res) => {

@@ -47,7 +47,21 @@ export const resetPasswordSchema = resetPasswordRequestSchema
   .extend({ confirm: z.string().min(1, "Confirm your new password") })
   .refine((v) => v.password === v.confirm, { path: ["confirm"], message: "Passwords do not match" });
 
+/** What the API accepts. Public sign-ups always get the STAFF role; the server never reads a role from the body. */
+export const signupRequestSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(150, "Use 150 characters or fewer"),
+  email,
+  password: newPassword,
+});
+
+/** What the form validates: the request plus a confirmation field. */
+export const signupSchema = signupRequestSchema
+  .extend({ confirm: z.string().min(1, "Confirm your password") })
+  .refine((v) => v.password === v.confirm, { path: ["confirm"], message: "Passwords do not match" });
+
 export type LoginInput = z.infer<typeof loginSchema>;
+export type SignupRequest = z.infer<typeof signupRequestSchema>;
+export type SignupInput = z.infer<typeof signupSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordRequest = z.infer<typeof resetPasswordRequestSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

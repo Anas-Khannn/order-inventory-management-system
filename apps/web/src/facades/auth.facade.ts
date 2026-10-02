@@ -1,9 +1,12 @@
-import type { ForgotPasswordInput, LoginInput, ResetPasswordInput, SessionDto, UserDto, UserRole } from "@repo/shared";
+import type { ForgotPasswordInput, LoginInput, ResetPasswordInput, SessionDto, SignupInput, UserDto, UserRole } from "@repo/shared";
 import { http } from "@/lib/http";
 
 /** FACADE: UI code never touches fetch/URLs/response shapes directly. */
 export const authFacade = {
   login: async (input: LoginInput) => (await http<{ data: SessionDto }>("/auth/login", { method: "POST", body: JSON.stringify(input) })).data,
+  /** Creates a Staff account and returns a signed-in session. */
+  signup: async ({ name, email, password }: SignupInput) =>
+    (await http<{ data: SessionDto }>("/auth/signup", { method: "POST", body: JSON.stringify({ name, email, password }) })).data,
   /** Uses the token already set on the http client. */
   logout: async () => {
     await http("/auth/logout", { method: "POST" });

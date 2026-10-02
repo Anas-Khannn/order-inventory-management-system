@@ -11,6 +11,12 @@ export const authRepository = {
     return row;
   },
 
+  /** New accounts are always STAFF; only an admin may raise a role later. */
+  async insertUser(name: string, email: string, passwordHash: string) {
+    const [row] = await db.insert(users).values({ name, email: email.toLowerCase(), passwordHash, role: "STAFF" }).returning();
+    return row!;
+  },
+
   async insertSession(userId: number, tokenHash: string, expiresAt: Date) {
     await db.insert(sessions).values({ userId, tokenHash, expiresAt });
   },

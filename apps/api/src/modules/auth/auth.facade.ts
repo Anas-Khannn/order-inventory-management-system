@@ -1,7 +1,7 @@
-import type { ForgotPasswordInput, LoginInput, ResetPasswordRequest, SessionDto, UserDto } from "@repo/shared";
+import type { ForgotPasswordInput, LoginInput, ResetPasswordRequest, SessionDto, SignupRequest, UserDto } from "@repo/shared";
 import { env } from "../../config/env";
 import { db } from "../../db/client";
-import { AppError } from "../../errors";
+import { AppError, conflict, isUniqueViolation } from "../../errors";
 import { DUMMY_HASH, hashPassword, hashToken, newToken, verifyPassword } from "./crypto";
 import { createFailureLimiter } from "./rate-limit";
 import { authRepository, type UserRow } from "./auth.repository";
@@ -13,10 +13,20 @@ const RESET_TTL_MS = 30 * 60_000;
 /** 5 failed sign-ins per email and IP every 15 minutes. */
 const loginLimiter = createFailureLimiter({ max: 5, windowMs: 15 * 60_000 });
 
+/** 10 sign-ups per IP every hour, to slow down scripted account creation. */
+const signupLimiter = createFailureLimiter({ max: 10, windowMs: 60 * 60_000 });
+
 export const toUserDto = (u: UserRow): UserDto => ({ id: u.id, name: u.name, email: u.email, role: u.role });
 
 const invalidCredentials = () => new AppError(401, "INVALID_CREDENTIALS", "Email or password is incorrect.");
 export const unauthorized = () => new AppError(401, "UNAUTHORIZED", "Your session has ended. Sign in again.");
+
+async function startSession(user: UserRow, remember: boolean): Promise<SessionDto> {
+  const token = newToken();
+  const expiresAt = new Date(Date.now() + (remember ? REMEMBER_TTL_MS : SESSION_TTL_MS));
+  await authRepository.insertSession(user.id, hashToken(token), expiresAt);
+  return { user: toUserDto(user), token, expiresAt: expiresAt.toISOString() };
+}
 
 /**
  * FACADE: the single entry point routes and middleware use for authentication.
@@ -37,10 +47,23 @@ export const authFacade = {
     }
     loginLimiter.reset(key);
 
-    const token = newToken();
-    const expiresAt = new Date(Date.now() + (remember ? REMEMBER_TTL_MS : SESSION_TTL_MS));
-    await authRepository.insertSession(user.id, hashToken(token), expiresAt);
-    return { user: toUserDto(user), token, expiresAt: expiresAt.toISOString() };
+    return startSession(user, remember);
+  },
+
+  /** Creates a STAFF account and signs it in straight away. */
+  async signup({ name, email, password }: SignupRequest, ip: string): Promise<SessionDto> {
+    const wait = signupLimiter.retryAfter(ip);
+    if (wait) throw new AppError(429, "TOO_MANY_ATTEMPTS", `Too many new accounts from this network. Try again in ${Math.ceil(wait / 60)} minutes.`, { retryAfter: wait });
+    signupLimiter.fail(ip);
+
+    let user: UserRow;
+    try {
+      user = await authRepository.insertUser(name, email, await hashPassword(password));
+    } catch (e) {
+      // The unique index on lower(email) decides; no check-then-insert race.
+      throw isUniqueViolation(e) ? conflict("EMAIL_TAKEN", "An account with this email already exists.", [{ path: "email", message: "This email already has an account" }]) : e;
+    }
+    return startSession(user, false);
   },
 
   async authenticate(token: string): Promise<UserDto> {
