@@ -26,7 +26,7 @@ pnpm db:seed                # 14 products + 3 users (one per role, password Demo
 pnpm dev                    # web → :5173   api → :4000
 ```
 
-Open http://localhost:5173 and sign in. In development the sign-in page offers the three seeded roles (`admin@store.test`, `manager@store.test`, `staff@store.test`).
+Open http://localhost:5173 and sign in, or create an account (new accounts get the Staff role). In development the sign-in page offers the three seeded roles (`admin@store.test`, `manager@store.test`, `staff@store.test`).
 
 > Need pnpm? `npm i -g pnpm` (Node 20+ required).
 
@@ -80,12 +80,14 @@ Every `/api/products` and `/api/orders` route needs `Authorization: Bearer <toke
 - Passwords: `scrypt` (Node standard library), salted, compared in constant time.
 - Sessions: random 256-bit opaque tokens. Only their SHA-256 is stored, so logout and password reset can revoke them.
 - Sign-in: 5 failed attempts per email + IP every 15 minutes; unknown emails take the same time as wrong passwords.
+- Sign-up: public, but every new account is STAFF (the server ignores any role in the body); 10 sign-ups per IP per hour.
 - Reset links: single use, 30 minutes, end every session of the user. No mail service yet: outside production the link is logged and returned (`AUTH_EXPOSE_RESET_LINK`).
 
 ## 🔌 API
 
 | Method | Endpoint | Notes |
 |---|---|---|
+| POST | `/api/auth/signup` | `{ name, email, password }` → 201 with a session; role is always STAFF; duplicate email → `409 EMAIL_TAKEN` |
 | POST | `/api/auth/login` | `{ email, password, remember }` → `{ user, token, expiresAt }` |
 | POST | `/api/auth/logout` | revokes the current token (204) |
 | GET | `/api/auth/me` | the signed-in user |
@@ -137,5 +139,4 @@ cd apps/web && npx shadcn@latest add select tabs toast
 - Concurrency: two buyers for the last unit are serialized by the row lock, so the second one fails validation instead of overselling.
 - No mail provider yet: password reset links are logged and returned by the API outside production. Production needs an email sender.
 - The sign-in rate limit is in memory, so it applies per API process. Several instances would need Redis or a DB table.
-- `users:manage` exists as a permission, but there is no user management screen yet.
-- Fill in the "Tools / effort" section of your own submission README (time spent and AI usage).
+- `users:manage` exists as a permission, but there is no user management screen yet, so raising a Staff account's role is done in the database.
